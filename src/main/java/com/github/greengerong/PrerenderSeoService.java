@@ -28,9 +28,11 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static com.google.common.collect.FluentIterable.from;
+import java.util.concurrent.ExecutionException;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.apache.http.HttpHeaders.CONTENT_LENGTH;
 import static org.apache.http.HttpHeaders.HOST;
+import za.wesbank.wbo.service.properties.PropertiesLoader;
 
 public class PrerenderSeoService {
     private final static Logger log = LoggerFactory.getLogger(PrerenderSeoService.class);
@@ -80,7 +82,7 @@ public class PrerenderSeoService {
     }
 
     private boolean handlePrerender(HttpServletRequest servletRequest, HttpServletResponse servletResponse)
-            throws URISyntaxException, IOException {
+            throws URISyntaxException, IOException, ExecutionException {
         if (shouldShowPrerenderedPage(servletRequest)) {
             this.preRenderEventHandler = prerenderConfig.getEventHandler();
             if (beforeRender(servletRequest, servletResponse) || proxyPrerenderedPageResponse(servletRequest, servletResponse)) {
@@ -197,8 +199,9 @@ public class PrerenderSeoService {
         return request.getRequestURL().toString();
     }
 
-    private String getApiUrl(String url) {
-        String prerenderServiceUrl = prerenderConfig.getPrerenderServiceUrl();
+    private String getApiUrl(String url) throws ExecutionException {
+        //String prerenderServiceUrl = prerenderConfig.getPrerenderServiceUrl();
+        String prerenderServiceUrl = PropertiesLoader.CONFIG_PARAMS_MAP.get("PRERENDERURL");
         if (!prerenderServiceUrl.endsWith("/")) {
             prerenderServiceUrl += "/";
         }
@@ -334,7 +337,7 @@ public class PrerenderSeoService {
     }
 
     private boolean proxyPrerenderedPageResponse(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, URISyntaxException {
+            throws IOException, URISyntaxException, ExecutionException {
         final String apiUrl = getApiUrl(getFullUrl(request));
         log.trace(String.format("Prerender proxy will send request to:%s", apiUrl));
         final HttpGet getMethod = getHttpGet(apiUrl);

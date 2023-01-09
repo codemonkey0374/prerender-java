@@ -71,6 +71,7 @@ public class PrerenderSeoService {
     }
 
     public boolean prerenderIfEligible(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        log.debug("PrerendderSEO: In prerender if eligible");
         try {
             if (handlePrerender(servletRequest, servletResponse)) {
                 return true;
@@ -82,13 +83,15 @@ public class PrerenderSeoService {
     }
 
     private boolean handlePrerender(HttpServletRequest servletRequest, HttpServletResponse servletResponse)
-            throws URISyntaxException, IOException, ExecutionException {
+            throws URISyntaxException, IOException, ExecutionException, Exception {
         if (shouldShowPrerenderedPage(servletRequest)) {
+            log.debug("PrerendderSEO: In should show prerendered page = true");
             this.preRenderEventHandler = prerenderConfig.getEventHandler();
             if (beforeRender(servletRequest, servletResponse) || proxyPrerenderedPageResponse(servletRequest, servletResponse)) {
                 return true;
             }
         }
+        log.debug("PrerendderSEO: In prerender if eligible = false");
         return false;
     }
 
@@ -97,15 +100,15 @@ public class PrerenderSeoService {
         final String url = getRequestURL(request);
         final String referer = request.getHeader("Referer");
 
-        log.trace(String.format("checking request for %s from User-Agent %s and referer %s", url, userAgent, referer));
+        log.debug(String.format("checking request for %s from User-Agent %s and referer %s", url, userAgent, referer));
 
         if (!HttpGet.METHOD_NAME.equals(request.getMethod())) {
-            log.trace("Request is not HTTP GET; intercept: no");
+            log.debug("Request is not HTTP GET; intercept: no");
             return false;
         }
 
         if (isInResources(url)) {
-            log.trace("request is for a (static) resource; intercept: no");
+            log.debug("request is for a (static) resource; intercept: no");
             return false;
         }
         
@@ -116,32 +119,33 @@ public class PrerenderSeoService {
 
         final List<String> whiteList = prerenderConfig.getWhitelist();
         if (whiteList != null && !isInWhiteList(url, whiteList)) {
-            log.trace("Whitelist is enabled, but this request is not listed; intercept: no");
+            log.debug("Whitelist is enabled, but this request is not listed; intercept: no");
             return false;
         }
 
         final List<String> blacklist = prerenderConfig.getBlacklist();
         if (blacklist != null && isInBlackList(url, referer, blacklist)) {
-            log.trace("Blacklist is enabled, and this request is listed; intercept: no");
+            log.debug("Blacklist is enabled, and this request is listed; intercept: no");
             return false;
         }
 
         if (hasEscapedFragment(request)) {
-            log.trace("Request Has _escaped_fragment_; intercept: yes");
+            log.debug("Request Has _escaped_fragment_; intercept: yes");
             return true;
         }
 
         if (StringUtils.isBlank(userAgent)) {
-            log.trace("Request has blank userAgent; intercept: no");
+            log.debug("Request has blank userAgent; intercept: no");
             return false;
         }
 
         if (!isInSearchUserAgent(userAgent)) {
-            log.trace("Request User-Agent is not a search bot; intercept: no");
+            log.debug("Request User-Agent is not a search bot; intercept: no");
             return false;
         }
 
-        log.trace(String.format("Defaulting to request intercept(user-agent=%s): yes", userAgent));
+        log.debug(String.format("Defaulting to request intercept(user-agent=%s): yes", userAgent));
+        log.debug("returning true for prerender for request: " + url);
         return true;
     }
 
@@ -205,7 +209,7 @@ public class PrerenderSeoService {
         if (!prerenderServiceUrl.endsWith("/")) {
             prerenderServiceUrl += "/";
         }
-        return prerenderServiceUrl + url;
+        return prerenderServiceUrl + url.replaceFirst("http", "https");
     }
 
     /**
@@ -323,7 +327,9 @@ public class PrerenderSeoService {
     }
 
     private boolean beforeRender(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        log.debug("PrerendderSEO: In before render");
         if (preRenderEventHandler != null) {
+            log.debug("PrerendderSEO: In before render prerendereventhandler is not null");
             final String html = preRenderEventHandler.beforeRender(request);
             if (isNotBlank(html)) {
                 final PrintWriter writer = response.getWriter();
@@ -333,12 +339,14 @@ public class PrerenderSeoService {
                 return true;
             }
         }
+        log.debug("PrerendderSEO: In before render prerendereventhandler is null");
         return false;
     }
 
     private boolean proxyPrerenderedPageResponse(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, URISyntaxException, ExecutionException {
+            throws IOException, URISyntaxException, ExecutionException, Exception {
         final String apiUrl = getApiUrl(getFullUrl(request));
+        log.debug("Full API URL : " + apiUrl);
         log.trace(String.format("Prerender proxy will send request to:%s", apiUrl));
         final HttpGet getMethod = getHttpGet(apiUrl);
         copyRequestHeaders(request, getMethod);
@@ -353,7 +361,12 @@ public class PrerenderSeoService {
             html = afterRender(request, response, prerenderServerResponse, html);
             responseEntity(html, response);
             return true;
-        } finally {
+        } 
+        catch(Exception e) {
+            log.debug("Prerender : Error occured during prefetch " ,e);
+            throw e;
+        }
+        finally {
             closeQuietly(prerenderServerResponse);
         }
     }

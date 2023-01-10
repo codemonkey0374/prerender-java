@@ -209,8 +209,10 @@ public class PrerenderSeoService {
         if (!prerenderServiceUrl.endsWith("/")) {
             prerenderServiceUrl += "/";
         }
-        return prerenderServiceUrl + url.replaceFirst("http", "https");
+        return prerenderServiceUrl + url.replaceFirst("http", "https").replaceFirst(":80", "");
     }
+    
+
 
     /**
      * Copy proxied response headers back to the servlet client.
